@@ -48,7 +48,7 @@ class MutationDataset(Dataset):
             idx (integer): should take a value between zero and the length of the dataset
         """
         patient_id = self.patients[idx].patientId
-        sample = [m for m in self.mutations if m.patiendId == patient_id]
+        sample = [m for m in self.mutations if m.patientId == patient_id]
 
         if self.transform:
             sample = self.transform(sample)
