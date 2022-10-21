@@ -1,9 +1,10 @@
 """ Dataset classes for cBioPortal datasets. """
 
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
-from bravado.client import SwaggerClient
 from torch.utils.data import Dataset
+
+from cbioportal import CBioPortalSwaggerClient, MutationModel, PatientModel
 
 
 class MutationDataset(Dataset):
@@ -22,7 +23,7 @@ class MutationDataset(Dataset):
             transform (optional callable): any transform to be applied to individual samples.
 
         """
-        cbioportal = SwaggerClient.from_url(
+        client = CBioPortalSwaggerClient.from_url(
             from_url,
             config={
                 "validate_requests": False,
@@ -30,17 +31,17 @@ class MutationDataset(Dataset):
                 "validate_swagger_spec": False,
             },
         )
-        self.mutations = cbioportal.Mutations.getMutationsInMolecularProfileBySampleListIdUsingGET(
+        self.mutations = client.Mutations.getMutationsInMolecularProfileBySampleListIdUsingGET(
             molecularProfileId=f"{study_id}_mutations",
             sampleListId=f"{study_id}_all",
             projection="DETAILED",
         ).result()
-
-        self.patients = cbioportal.Patients.getAllPatientsInStudyUsingGET(studyId=study_id).result()
+        self.patients = client.Patients.getAllPatientsInStudyUsingGET(studyId=study_id).result()
         self.transform = transform
 
     def __len__(self) -> int:
         """Returns number of samples (in this case, patients) in the dataset."""
+        self.patients = cast(list[PatientModel], self.patients)
         return len(self.patients)
 
     def __getitem__(self, idx: int):
@@ -49,6 +50,8 @@ class MutationDataset(Dataset):
         Args:
             idx (integer): should take a value between zero and the length of the dataset
         """
+        self.patients = cast(list[PatientModel], self.patients)
+        self.mutations = cast(list[MutationModel], self.mutations)
         patient_id = self.patients[idx].patientId
         sample = [m for m in self.mutations if m.patientId == patient_id]
 
