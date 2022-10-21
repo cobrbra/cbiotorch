@@ -15,6 +15,6 @@ echo "Checking typing"
 mypy $repo_dir --ignore-missing-imports
 
 echo "Checking code quality"
-pylint $repo_dir/causal_survival_metrics --disable=E1101
+pylint $repo_dir/cbiotorch --disable=E1101
 pylint $repo_dir/tests --disable=E1101
 black -t py38 -l 100 --check $repo_dir
