@@ -1,4 +1,4 @@
-""" Data loaders. """
+""" Dataset classes for cBioPortal datasets. """
 
 from typing import Callable, Optional
 
@@ -17,7 +17,9 @@ class MutationDataset(Dataset):
     ) -> None:
         """
         Args:
-            dataset
+            study_id (string): identifier for study.
+            from_url (string): URL to use for querying.
+            transform (optional callable): any transform to be applied to individual samples.
 
         """
         cbioportal = SwaggerClient.from_url(
