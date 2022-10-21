@@ -1,0 +1,20 @@
+#!/bin/bash
+
+repo_dir=`git rev-parse --show-toplevel`  
+
+# copy this file to be a git hook (only for future commits) from the root directory
+cp $repo_dir/pre-commit $repo_dir/.git/hooks/
+
+# set hook to be executable
+chmod +x $repo_dir/.git/hooks/pre-commit
+
+echo "Creating requirements.txt"
+pipreqs --savepath=$repo_dir/requirements.in $repo_dir && pip-compile --quiet && rm $repo_dir/requirements.in && git add $repo_dir/requirements.txt
+
+echo "Checking typing"
+mypy $repo_dir --ignore-missing-imports
+
+echo "Checking code quality"
+pylint $repo_dir/causal_survival_metrics --disable=E1101
+pylint $repo_dir/tests --disable=E1101
+black -t py38 -l 100 --check $repo_dir
