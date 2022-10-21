@@ -29,7 +29,7 @@ class MutationDataset(Dataset):
             },
         )
         self.mutations = cbioportal.Mutations.getMutationsInMolecularProfileBySampleListIdUsingGET(
-            molecularProfileID=f"{study_id}_mutations",
+            molecularProfileId=f"{study_id}_mutations",
             sampleListId=f"{study_id}_all",
             projection="DETAILED",
         ).result()
