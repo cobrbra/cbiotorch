@@ -28,7 +28,7 @@ class MutationDataset(Dataset):
                 "validate_swagger_spec": False,
             },
         )
-        self.mutations = cbioportal.Mutations.getMutationsInMolecularProfileBySampleListIDUsingGET(
+        self.mutations = cbioportal.Mutations.getMutationsInMolecularProfileBySampleListIdUsingGET(
             molecularProfileID=f"{study_id}_mutations",
             sampleListId=f"{study_id}_all",
             projection="DETAILED",
