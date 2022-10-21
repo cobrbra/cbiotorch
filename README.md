@@ -1,2 +1,2 @@
-# msk_loaders
-Loaders for the MSK-IMPACT sequencing and clinical datasets to be used in the causality project.
+# cbiotorch
+PyTorch data loaders for cBioPortal sequencing and clinical datasets, using the bravado API.
