@@ -3,13 +3,13 @@ Transform functions to take raw mutation data acquired from cBioPortal and turn 
 useful for analysis with PyTorch. Designed to be similar in style to torchvision transforms for
 images -- for example, compose class is almost identical to torchvision.compose.
 """
+# pylint: disable = too-few-public-methods
+
 
 from abc import ABC, abstractmethod
 from typing import Optional
 
 import pandas as pd
-
-# pylint: disable = too-few-public-methods
 
 
 class Transform(ABC):
@@ -65,6 +65,11 @@ class ToPandas(Transform):
 # class ToTensor(Transform):
 #     """Convert cBioPortal mutation query format to pytorch tensor."""
 
+#     ...
+
+# class ToSparseTensor(Transform):
+#     """ Convert cBioPortal mutation query format to pytorch sparse tensor."""
+#
 #     ...
 
 
