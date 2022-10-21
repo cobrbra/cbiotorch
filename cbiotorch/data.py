@@ -34,7 +34,7 @@ class MutationDataset(Dataset):
             projection="DETAILED",
         ).result()
 
-        self.patients = cbioportal.Patients.getAllPatientsInStudyUsingGET(studyID=study_id).result()
+        self.patients = cbioportal.Patients.getAllPatientsInStudyUsingGET(studyId=study_id).result()
         self.transform = transform
 
     def __len__(self) -> int:
