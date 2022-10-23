@@ -6,7 +6,9 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+
 from .loaders import CBioPortalLoader, FileThenAPI
+from .transform import Compose, Transform, FilterSelect
 
 
 class MutationDataset(Dataset):
@@ -16,7 +18,7 @@ class MutationDataset(Dataset):
         self,
         study_id: str,
         loader: CBioPortalLoader = FileThenAPI(),
-        transform: Optional[Callable] = None,
+        transform: Transform = FilterSelect(),
     ) -> None:
         """
         Args:
@@ -27,6 +29,9 @@ class MutationDataset(Dataset):
         """
         self.study_id = study_id
         self.mutations, self.patients = loader(study_id=self.study_id)
+        if isinstance(transform, list):
+            self.transform: Transform = Compose(transform)
+        else:
         self.transform = transform
 
     def __len__(self) -> int:
@@ -46,3 +51,18 @@ class MutationDataset(Dataset):
             sample = self.transform(sample)
 
         return sample
+
+    def write(self, out_dir: str = ".", replace: bool = False) -> None:
+        """Write mutation and patient files."""
+        if isdir(pjoin(out_dir, self.study_id)):
+            if not replace:
+                raise ValueError(
+                    f"Directory {pjoin(out_dir, self.study_id)} already exists. "
+                    "Set replace=True or name new directory.",
+                )
+
+        else:
+            makedirs(pjoin(out_dir, self.study_id))
+
+        self.mutations.to_csv(pjoin(out_dir, self.study_id, "mutations.csv"), index=False)
+        self.patients.to_csv(pjoin(out_dir, self.study_id, "patients.csv"), index=False)
