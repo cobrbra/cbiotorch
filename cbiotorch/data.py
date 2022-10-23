@@ -2,6 +2,7 @@
 
 from os.path import join as pjoin, isdir
 from os import makedirs
+from typing import List
 
 import pandas as pd
 import torch
@@ -9,7 +10,7 @@ from torch.utils.data import Dataset
 
 
 from .loaders import CBioPortalLoader, FileThenAPI
-from .transform import Compose, Transform, FilterSelect
+from .transforms import Compose, Transform, FilterSelect
 
 
 class MutationDataset(Dataset):
@@ -19,7 +20,7 @@ class MutationDataset(Dataset):
         self,
         study_id: str,
         loader: CBioPortalLoader = FileThenAPI(),
-        transform: Transform = FilterSelect(),
+        transform: Transform | List[Transform] = FilterSelect(),
     ) -> None:
         """
         Args:
