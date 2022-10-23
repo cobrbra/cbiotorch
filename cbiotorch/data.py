@@ -25,7 +25,7 @@ class MutationDataset(Dataset):
         Args:
             study_id (string): identifier for study.
             from_url (string): URL to use for querying.
-            transform (optional callable): any transform to be applied to individual samples.
+            transform (optional Transform): any transform to be applied to individual samples.
 
         """
         self.study_id = study_id
@@ -58,7 +58,13 @@ class MutationDataset(Dataset):
         self.transform = Compose([self.transform, transform])
 
     def write(self, out_dir: str = ".", replace: bool = False) -> None:
-        """Write mutation and patient files."""
+        """
+        Write mutation and patient files.
+
+        Args:
+            out_dir (string): directory into which to write study datasets.
+            replace (boolean): whether to replace an already existing directory.
+        """
         if isdir(pjoin(out_dir, self.study_id)):
             if not replace:
                 raise ValueError(
