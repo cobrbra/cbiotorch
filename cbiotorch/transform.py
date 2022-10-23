@@ -56,10 +56,58 @@ class ToPandas(Transform):
         return mutations_df
 
 
-# class ToPandasMatrix(Transform):
-#     """Convert cBioPortal mutation query format to pandas matrix."""
+class ToPandasCountMatrix(Transform):
+    """
+    Convert cBioPortal mutation query format to pandas matrix.
 
-#     ...
+    Args:
+        group_cols (list of strings): columns whose values will form the column indices in
+            resultant matrix.
+        index_cols (list of strings): columns whose values will form the row indices in
+            resultant matrix.
+        filter_rows (dictionary of string-list pairs): specifies columns on whic filter for a
+            given set of values.
+        select_cols (optional list of strings): specifies columns to select.
+    """
+
+    def __init__(
+        self,
+        group_cols: List[str],
+        index_cols: List[str] = ["patientId"],
+        filter_rows: Optional[dict[str, list]] = None,
+        select_cols: Optional[List[str]] = None,
+    ) -> None:
+        self.group_cols = group_cols
+        self.index_cols = index_cols
+        self.filter_rows = filter_rows
+        self.select_cols = select_cols
+
+    def __call__(self, sample_mutations: List[MutationModel]) -> pd.DataFrame:
+        if self.select_cols:
+            self.select_cols = list(
+                set(self.select_cols) | set(self.group_cols) | set(self.index_cols)
+            )
+        transform_to_pandas = ToPandas(filter_rows=self.filter_rows, select_cols=self.select_cols)
+        mutations_df = transform_to_pandas(sample_mutations=sample_mutations)
+
+        if not (set(self.group_cols) | set(self.index_cols)).issubset(mutations_df.columns):
+            raise ValueError("Not all group_cols and index_cols are included in data.")
+        remaining_cols = list(
+            set(mutations_df.columns) - set(self.group_cols) - set(self.index_cols)
+        )
+        if remaining_cols:
+            values_col = remaining_cols[0]
+        else:
+            raise ValueError("There are no columns left beyond index_cols and group_cols.")
+        mutations_matrix = pd.pivot_table(
+            mutations_df,
+            values=values_col,
+            index=self.index_cols,
+            columns=self.group_cols,
+            aggfunc=len,
+            fill_value=0,
+        )
+        return mutations_matrix
 
 
 # class ToTensor(Transform):
