@@ -17,8 +17,8 @@ echo "Checking typing"
 mypy $repo_dir --ignore-missing-imports
 
 echo "Checking code quality"
-pylint $repo_dir/cbiotorch --disable=too-few-public-methods --extension-pkg-whitelist=torch \
+pylint $repo_dir/cbiotorch --disable=too-few-public-methods --generated-members=torch \
 --init-hook "import sys; sys.path.insert(0, './cbiotorch')"
-pylint $repo_dir/tests --disable=too-few-public-methods --extension-pkg-whitelist=torch \
+pylint $repo_dir/tests --disable=too-few-public-methods --generated-members=torch \
 --init-hook "import sys; sys.path.insert(0, './cbiotorch')"
 black -t py38 -l 100 --check $repo_dir
