@@ -137,16 +137,18 @@ class ToSparseCountTensor(Transform):
         return torch.sparse_coo_tensor(tensor_index, tensor_values, tensor_size)
 
 
-class Compose:
+class Compose(Transform):
     """Compose several transforms."""
 
     def __init__(self, transforms: List[Transform]) -> None:
         self.transforms = transforms
 
-    def __call__(self, sample):
+    def __call__(
+        self, sample_mutations: pd.DataFrame | torch.Tensor
+    ) -> pd.DataFrame | torch.Tensor:
         for transform in self.transforms:
-            sample = transform(sample)
-        return sample
+            sample_mutations = transform(sample_mutations)
+        return sample_mutations
 
     def __repr__(self) -> str:
         format_string = self.__class__.__name__ + "("
