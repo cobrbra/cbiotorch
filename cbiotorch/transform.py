@@ -66,7 +66,7 @@ class ToPandasCountMatrix(Transform):
     Args:
         group_cols (list of strings): columns whose values will form the column indices in
             resultant matrix.
-        index_cols (list of strings): columns whose values will form the row indices in
+        index_cols (optional list of strings): columns whose values will form the row indices in
             resultant matrix.
         filter_rows (dictionary of string-list pairs): specifies columns on whic filter for a
             given set of values.
@@ -75,11 +75,11 @@ class ToPandasCountMatrix(Transform):
     def __init__(
         self,
         group_cols: List[str],
-        index_cols: List[str] = ["patientId"],
+        index_cols: Optional[List[str]] = None,
         filter_rows: Optional[dict[str, list]] = None,
     ) -> None:
         self.group_cols = group_cols
-        self.index_cols = index_cols
+        self.index_cols = ["patientId"] if index_cols is None else index_cols
         self.filter_rows = filter_rows
 
     def __call__(self, sample_mutations: List[MutationModel]) -> pd.DataFrame:
