@@ -70,7 +70,6 @@ class ToPandasCountMatrix(Transform):
             resultant matrix.
         filter_rows (dictionary of string-list pairs): specifies columns on whic filter for a
             given set of values.
-        select_cols (optional list of strings): specifies columns to select.
     """
 
     def __init__(
@@ -78,19 +77,13 @@ class ToPandasCountMatrix(Transform):
         group_cols: List[str],
         index_cols: List[str] = ["patientId"],
         filter_rows: Optional[dict[str, list]] = None,
-        select_cols: Optional[List[str]] = None,
     ) -> None:
         self.group_cols = group_cols
         self.index_cols = index_cols
         self.filter_rows = filter_rows
-        self.select_cols = select_cols
 
     def __call__(self, sample_mutations: List[MutationModel]) -> pd.DataFrame:
-        if self.select_cols:
-            self.select_cols = list(
-                set(self.select_cols) | set(self.group_cols) | set(self.index_cols)
-            )
-        transform_to_pandas = ToPandas(filter_rows=self.filter_rows, select_cols=self.select_cols)
+        transform_to_pandas = ToPandas(filter_rows=self.filter_rows)
         mutations_df = transform_to_pandas(sample_mutations=sample_mutations)
 
         if not (set(self.group_cols) | set(self.index_cols)).issubset(mutations_df.columns):
