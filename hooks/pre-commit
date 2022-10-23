@@ -9,12 +9,16 @@ cp $repo_dir/hooks/pre-commit $repo_dir/.git/hooks/
 chmod +x $repo_dir/.git/hooks/pre-commit
 
 echo "Creating requirements.txt"
-pipreqs --savepath=$repo_dir/requirements.in $repo_dir && pip-compile --quiet && rm $repo_dir/requirements.in && git add $repo_dir/requirements.txt
+pipreqs --savepath=$repo_dir/requirements.in $repo_dir && pip-compile --quiet 
+rm $repo_dir/requirements.in 
+git add $repo_dir/requirements.txt
 
 echo "Checking typing"
 mypy $repo_dir --ignore-missing-imports
 
 echo "Checking code quality"
-pylint $repo_dir/cbiotorch --disable=too-few-public-methods --init-hook "import sys; sys.path.insert(0, './cbiotorch')"
-pylint $repo_dir/tests --disable=too-few-public-methods --init-hook "import sys; sys.path.insert(0, './cbiotorch')"
+pylint $repo_dir/cbiotorch --disable=too-few-public-methods --extension-pkg-whitelist=torch \
+--init-hook "import sys; sys.path.insert(0, './cbiotorch')"
+pylint $repo_dir/tests --disable=too-few-public-methods --extension-pkg-whitelist=torch \
+--init-hook "import sys; sys.path.insert(0, './cbiotorch')"
 black -t py38 -l 100 --check $repo_dir
