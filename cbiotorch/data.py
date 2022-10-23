@@ -1,10 +1,12 @@
 """ Dataset classes for cBioPortal datasets. """
 
-from typing import Callable, Optional, cast
+from typing import Callable, List, Optional, cast
 
+import pandas as pd
+import torch
 from torch.utils.data import Dataset
 
-from cbioportal import CBioPortalSwaggerClient, MutationModel, PatientModel
+from .cbioportal import CBioPortalSwaggerClient, MutationModel, PatientModel  # type: ignore
 
 
 class MutationDataset(Dataset):
@@ -41,17 +43,17 @@ class MutationDataset(Dataset):
 
     def __len__(self) -> int:
         """Returns number of samples (in this case, patients) in the dataset."""
-        self.patients = cast(list[PatientModel], self.patients)
+        self.patients = cast(List[PatientModel], self.patients)
         return len(self.patients)
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx: int) -> List[MutationModel] | pd.DataFrame | torch.Tensor:
         """
         Access an individual sample in the dataset.
         Args:
             idx (integer): should take a value between zero and the length of the dataset
         """
-        self.patients = cast(list[PatientModel], self.patients)
-        self.mutations = cast(list[MutationModel], self.mutations)
+        self.patients = cast(List[PatientModel], self.patients)
+        self.mutations = cast(List[MutationModel], self.mutations)
         patient_id = self.patients[idx].patientId
         sample = [m for m in self.mutations if m.patientId == patient_id]
 
