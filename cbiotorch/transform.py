@@ -7,16 +7,19 @@ images -- for example, compose class is almost identical to torchvision.compose.
 
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, List
 
 import pandas as pd
+import torch
+
+from .cbioportal import MutationModel  # type: ignore
 
 
 class Transform(ABC):
     """Base class for Transforms to be applied to mutation data."""
 
     @abstractmethod
-    def __call__(self, sample):
+    def __call__(self, sample) -> List[MutationModel] | pd.DataFrame | torch.Tensor:
         """Transform class must be callable."""
 
 
@@ -25,18 +28,18 @@ class ToPandas(Transform):
     Convert cBioPortal mutation query result to pandas dataframe.
 
     Args:
-        filter (optional dictionary of string-list pairs): specifies columns on whic filter for a
-            given set of values.
-        select (optional list of strings): specifies columns to select.
+        filter_rows (optional dictionary of string-list pairs): specifies columns on whic filter
+        for a given set of values.
+        select_cols (optional list of strings): specifies columns to select.
     """
 
     def __init__(
-        self, filter_rows: Optional[dict[str, list]] = None, select_cols: Optional[list[str]] = None
+        self, filter_rows: Optional[dict[str, list]] = None, select_cols: Optional[List[str]] = None
     ) -> None:
         self.filter_rows = filter_rows
         self.select_cols = select_cols
 
-    def __call__(self, sample_mutations) -> pd.DataFrame:
+    def __call__(self, sample_mutations: List[MutationModel]) -> pd.DataFrame:
         mutations_df = pd.DataFrame(
             [
                 dict(
@@ -124,7 +127,7 @@ class ToPandasCountMatrix(Transform):
 class Compose:
     """Compose several transforms."""
 
-    def __init__(self, transforms: list[Transform]) -> None:
+    def __init__(self, transforms: List[Transform]) -> None:
         self.transforms = transforms
 
     def __call__(self, sample):
