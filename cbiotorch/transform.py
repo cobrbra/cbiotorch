@@ -11,20 +11,20 @@ from typing import Dict, Optional, List
 import pandas as pd
 import torch
 
-from .cbioportal import MutationModel  # type: ignore
-
 
 class Transform(ABC):
     """Base class for Transforms to be applied to mutation data."""
 
     @abstractmethod
-    def __call__(self, sample) -> List[MutationModel] | pd.DataFrame | torch.Tensor:
+    def __call__(
+        self, sample_mutations: pd.DataFrame | torch.Tensor
+    ) -> pd.DataFrame | torch.Tensor:
         """Transform class must be callable."""
 
 
-class ToPandas(Transform):
+class FilterSelect(Transform):
     """
-    Convert cBioPortal mutation query result to pandas dataframe.
+    Filter and select mutation datasets.
 
     Args:
         filter_rows (optional dictionary of string-list pairs): specifies columns on whic filter
@@ -33,29 +33,24 @@ class ToPandas(Transform):
     """
 
     def __init__(
-        self, filter_rows: Optional[dict[str, list]] = None, select_cols: Optional[List[str]] = None
+        self,
+        filter_rows: Optional[dict[str, list]] = None,
+        select_cols: Optional[List[str] | str] = None,
     ) -> None:
         self.filter_rows = filter_rows
         self.select_cols = select_cols
 
-    def __call__(self, sample_mutations: List[MutationModel]) -> pd.DataFrame:
-        mutations_df = pd.DataFrame(
-            [
-                dict(
-                    {k: getattr(m, k) for k in dir(m)},
-                    **{k: getattr(m.gene, k) for k in dir(m.gene)},
-                )
-                for m in sample_mutations
-            ]
-        )
+    def __call__(self, sample_mutations: pd.DataFrame) -> pd.DataFrame:
         if self.filter_rows:
             for column, allowed_values in self.filter_rows.items():
-                mutations_df = mutations_df[mutations_df[column].isin(allowed_values)]
+                sample_mutations = sample_mutations[sample_mutations[column].isin(allowed_values)]
         if self.select_cols:
-            mutations_df = mutations_df[
-                [col for col in mutations_df.columns if col in self.select_cols]
+            if isinstance(self.select_cols, str):
+                self.select_cols = [self.select_cols]
+            sample_mutations = sample_mutations[
+                [col for col in sample_mutations.columns if col in self.select_cols]
             ]
-        return mutations_df
+        return sample_mutations
 
 
 class ToPandasCountMatrix(Transform):
@@ -81,32 +76,23 @@ class ToPandasCountMatrix(Transform):
         self.index_cols = ["patientId"] if index_cols is None else index_cols
         self.filter_rows = filter_rows
 
-    def __call__(self, sample_mutations: List[MutationModel]) -> pd.DataFrame:
-        transform_to_pandas = ToPandas(filter_rows=self.filter_rows)
-        mutations_df = transform_to_pandas(sample_mutations=sample_mutations)
-
-        if not (set(self.dims) | set(self.index_cols)).issubset(mutations_df.columns):
+    def __call__(self, sample_mutations: pd.DataFrame) -> pd.DataFrame:
+        filter_transform = FilterSelect(filter_rows=self.filter_rows)
+        mutations = filter_transform(sample_mutations=sample_mutations)
+        all_dims = set(self.dims) | set(self.index_cols)
+        if not all_dims.issubset(mutations.columns):
             raise ValueError("Not all dims and index_cols are included in data.")
-        remaining_cols = list(set(mutations_df.columns) - set(self.dims) - set(self.index_cols))
-        if remaining_cols:
-            values_col = remaining_cols[0]
-        else:
-            raise ValueError("There are no columns left beyond index_cols and dims.")
+        mutation_counts = mutations.groupby(self.dims).size()
+        mutation_counts = mutation_counts.reset_index().rename(columns={0: "count"})
+
         mutations_matrix = pd.pivot_table(
-            mutations_df,
-            values=values_col,
+            mutations,
+            values="count",
             index=self.index_cols,
             columns=self.dims,
-            aggfunc=len,
             fill_value=0,
         )
         return mutations_matrix
-
-
-# class ToTensor(Transform):
-#     """Convert cBioPortal mutation query format to pytorch tensor."""
-
-#     ...
 
 
 class ToSparseCountTensor(Transform):
@@ -124,22 +110,20 @@ class ToSparseCountTensor(Transform):
 
     def __call__(
         self,
-        sample_mutations: List[MutationModel],
+        sample_mutations: pd.DataFrame,
     ) -> torch.Tensor:
 
         # Attempt to find a reference set for every tensor dimension
         for dim in self.dims:
             if dim not in self.dim_refs.keys():
-                if hasattr(sample_mutations[0], dim):
-                    self.dim_refs[dim] = list({str(getattr(m, dim)) for m in sample_mutations})
-                elif hasattr(sample_mutations[0].gene, dim):
-                    self.dim_refs[dim] = list({str(getattr(m.gene, dim)) for m in sample_mutations})
+                if dim in sample_mutations.columns:
+                    self.dim_refs[dim] = sample_mutations[dim].unique().astype(str).tolist()
                 else:
                     raise ValueError(f"No dimension reference available for {dim}")
 
-        transform_to_pandas = ToPandas(filter_rows=self.filter_rows)
-        mutations = transform_to_pandas(sample_mutations=sample_mutations)
-        mutation_counts = mutations.groupby(self.dims).size()
+        filter_transform = FilterSelect(filter_rows=self.filter_rows)
+        sample_mutations = filter_transform(sample_mutations=sample_mutations)
+        mutation_counts = sample_mutations.groupby(self.dims).size()
         mutation_counts = mutation_counts.reset_index().rename(columns={0: "count"})
 
         for dim in self.dims:
