@@ -1,6 +1,7 @@
 """ Dataset classes for cBioPortal datasets. """
 
-from typing import Callable, List, Optional, cast
+from os.path import join as pjoin, isdir
+from os import makedirs
 
 import pandas as pd
 import torch
@@ -32,7 +33,7 @@ class MutationDataset(Dataset):
         if isinstance(transform, list):
             self.transform: Transform = Compose(transform)
         else:
-        self.transform = transform
+            self.transform = transform
 
     def __len__(self) -> int:
         """Returns number of samples (in this case, patients) in the dataset."""
@@ -51,6 +52,10 @@ class MutationDataset(Dataset):
             sample = self.transform(sample)
 
         return sample
+
+    def add_transform(self, transform: Transform) -> None:
+        """Add a (further) transform to the mutation dataset."""
+        self.transform = Compose([self.transform, transform])
 
     def write(self, out_dir: str = ".", replace: bool = False) -> None:
         """Write mutation and patient files."""
