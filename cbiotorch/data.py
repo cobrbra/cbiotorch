@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import Dataset
 
 
-from .loaders import CBioPortalLoader, FileThenAPI
+from .loaders import CBioPortalLoader, LoadMutationsFromFileThenAPI
 from .transforms import Compose, Transform, FilterSelect
 
 
@@ -19,7 +19,7 @@ class MutationDataset(Dataset):
     def __init__(
         self,
         study_id: str,
-        loader: CBioPortalLoader = FileThenAPI(),
+        loader: CBioPortalLoader = LoadMutationsFromFileThenAPI(),
         transform: Transform | List[Transform] = FilterSelect(),
     ) -> None:
         """
@@ -30,15 +30,15 @@ class MutationDataset(Dataset):
 
         """
         self.study_id = study_id
-        self.mutations, self.patients = loader(study_id=self.study_id)
+        self.mutations, self.samples, self.sample_genes = loader(study_id=self.study_id)
         if isinstance(transform, list):
             self.transform: Transform = Compose(transform)
         else:
             self.transform = transform
 
     def __len__(self) -> int:
-        """Returns number of samples (in this case, patients) in the dataset."""
-        return len(self.patients)
+        """Returns number of samples in the dataset."""
+        return len(self.samples)
 
     def __getitem__(self, idx: int) -> pd.DataFrame | torch.Tensor:
         """
@@ -46,8 +46,8 @@ class MutationDataset(Dataset):
         Args:
             idx (integer): should take a value between zero and the length of the dataset
         """
-        patient_id = str(self.patients.at[idx, "patientId"])
-        sample = self.mutations[self.mutations.patientId == patient_id]
+        sample_id = str(self.samples.at[idx, "sampleId"])
+        sample = self.mutations[self.mutations.sampleId == sample_id]
 
         if self.transform:
             sample = self.transform(sample)
@@ -60,7 +60,7 @@ class MutationDataset(Dataset):
 
     def write(self, out_dir: str = ".", replace: bool = False) -> None:
         """
-        Write mutation and patient files.
+        Write mutation and sample, and gene panel spec files.
 
         Args:
             out_dir (string): directory into which to write study datasets.
@@ -77,4 +77,7 @@ class MutationDataset(Dataset):
             makedirs(pjoin(out_dir, self.study_id))
 
         self.mutations.to_csv(pjoin(out_dir, self.study_id, "mutations.csv"), index=False)
-        self.patients.to_csv(pjoin(out_dir, self.study_id, "patients.csv"), index=False)
+        self.samples.to_csv(pjoin(out_dir, self.study_id, "samples.csv"), index=False)
+        self.sample_genes.to_csv(
+            pjoin(out_dir, self.study_id, "sample_genes.csv"), index_label="sample_id"
+        )
