@@ -107,6 +107,14 @@ def get_mutations_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd
     return mutations_df
 
 
+def get_samples_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.DataFrame:
+    """Get samples dataframe from CBioPortal API."""
+    samples = client.Samples.getAllSamplesInStudyUsingGET(studyId=study_id).result()
+    samples = cast(List[SampleModel], samples)
+    samples_df = pd.DataFrame([{k: getattr(s, k) for k in dir(s)} for s in samples])
+    return samples_df
+
+
 def get_sample_genes_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.DataFrame:
     """Get matrix showing which genes were sequenced for which samples."""
     sample_gene_panels = client.Gene_Panel_Data.getGenePanelDataUsingPOST(
@@ -141,11 +149,3 @@ def get_sample_genes_from_api(client: CBioPortalSwaggerClient, study_id: str) ->
     }
     sample_genes_df = pd.DataFrame(sample_genes).transpose()
     return sample_genes_df
-
-
-def get_samples_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.DataFrame:
-    """Get samples dataframe from CBioPortal API."""
-    samples = client.Samples.getAllSamplesInStudyUsingGET(studyId=study_id).result()
-    samples = cast(List[SampleModel], samples)
-    samples_df = pd.DataFrame([{k: getattr(s, k) for k in dir(s)} for s in samples])
-    return samples_df
