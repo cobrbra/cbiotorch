@@ -55,7 +55,7 @@ class FilterSelect(Transform):
 
 class ToPandasCountMatrix(Transform):
     """
-    Convert cBioPortal mutation query format to pandas matrix.
+    Convert mutation dataset to matrix of counts across a given combination of dimensions.
 
     Args:
         dims (list of strings): columns whose values will form the column indices in
@@ -96,7 +96,16 @@ class ToPandasCountMatrix(Transform):
 
 
 class ToSparseCountTensor(Transform):
-    """Convert cBioPortal mutation query format to pytorch sparse tensor."""
+    """
+    Convert mutation dataset to pytorch sparse tensor.
+
+    Args:
+        dims (list of strings) which features (columns) of the mutation dataset should form
+            dimensions of resultant tensor.
+        dims_refs (dictionary of string/list of string pairs): a reference set of valid values
+            for dimensions of the resultant tensor. Important to specify, otherwise there may not
+            be consistency in tensor
+    """
 
     def __init__(
         self,
