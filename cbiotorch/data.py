@@ -2,7 +2,7 @@
 
 from os.path import join as pjoin, isdir
 from os import makedirs
-from typing import Hashable, List
+from typing import Dict, Hashable, List
 
 import pandas as pd
 import torch
@@ -44,14 +44,7 @@ class MutationDataset(Dataset):
         self.sample_genes = pd.concat(sample_genes).fillna(False)
 
         self.auto_gene_panel = self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
-        self.auto_dim_ref = dict(
-            {
-                dim: self.mutations[dim].unique().tolist()
-                for dim in self.mutations.columns
-                if isinstance(self.mutations[dim][0], Hashable)
-            },
-            hugoGeneSymbol=self.auto_gene_panel,
-        )
+
         if isinstance(transform, list):
             self.transform: Transform = Compose(transform)
         else:
@@ -82,6 +75,18 @@ class MutationDataset(Dataset):
     def reset_transform(self) -> None:
         """Reset the transform associated with a dataset to identity."""
         self.transform = FilterSelect()
+
+    def auto_dim_refs(self, use_auto_gene_panel: bool = True) -> Dict[str, List[str]]:
+        """Produce an automatically inferred reference set for all mutation features"""
+        auto_dim_ref = {
+            dim: self.mutations[dim].unique().tolist()
+            for dim in self.mutations.columns
+            if isinstance(self.mutations[dim][0], Hashable)
+        }
+        if use_auto_gene_panel:
+            auto_dim_ref["hugoGeneSymbol"] = self.auto_gene_panel
+
+        return auto_dim_ref
 
     def write(self, out_dir: str = "datasets", replace: bool = False) -> None:
         """
