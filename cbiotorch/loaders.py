@@ -59,7 +59,9 @@ class LoadMutationsFromFile(CBioPortalLoader):
 
         mutations_df = pd.read_csv(join(self.from_dir, study_id, "mutations.csv"))
         samples_df = pd.read_csv(join(self.from_dir, study_id, "samples.csv"))
-        sample_genes_df = pd.read_csv(join(self.from_dir, study_id, "sample_genes.csv"))
+        sample_genes_df = pd.read_csv(
+            join(self.from_dir, study_id, "sample_genes.csv"), index_col="sample_id"
+        )
 
         return mutations_df, samples_df, sample_genes_df
 
