@@ -16,6 +16,16 @@ class Transform(ABC):
     """Base class for Transforms to be applied to mutation data."""
 
     @abstractmethod
+    def __init__(self, dims: Optional[List[str]], dim_refs: Optional[Dict[str, List[str]]]) -> None:
+        """
+        Args:
+            dims (list of strings): identifies the features (columns) of the underlying mutations
+                dataset that will be used in the transform.
+            dim_refs (dictionary of string/list of strings pairs): identifies, for each dimension
+                specified in dims, a list of acceptable values.
+        """
+
+    @abstractmethod
     def __call__(
         self, sample_mutations: pd.DataFrame | torch.Tensor
     ) -> pd.DataFrame | torch.Tensor:
@@ -27,28 +37,28 @@ class FilterSelect(Transform):
     Filter and select mutation datasets.
 
     Args:
-        filter_rows (optional dictionary of string-list pairs): specifies columns on whic filter
-        for a given set of values.
-        select_cols (optional list of strings): specifies columns to select.
+        dims (optional list of strings): specifies columns to select.
+        dim_refs (optional dictionary of string-list pairs): specifies acceptable values to filter
+            for in each column.
     """
 
     def __init__(
         self,
-        filter_rows: Optional[dict[str, list]] = None,
-        select_cols: Optional[List[str] | str] = None,
+        dims: Optional[List[str] | str] = None,
+        dim_refs: Optional[dict[str, list]] = None,
     ) -> None:
-        self.filter_rows = filter_rows
-        self.select_cols = select_cols
+        self.dims = dims
+        self.dim_refs = dim_refs
 
     def __call__(self, sample_mutations: pd.DataFrame) -> pd.DataFrame:
-        if self.filter_rows:
-            for column, allowed_values in self.filter_rows.items():
+        if self.dim_refs:
+            for column, allowed_values in self.dim_refs.items():
                 sample_mutations = sample_mutations[sample_mutations[column].isin(allowed_values)]
-        if self.select_cols:
-            if isinstance(self.select_cols, str):
-                self.select_cols = [self.select_cols]
+        if self.dims:
+            if isinstance(self.dims, str):
+                self.dims = [self.dims]
             sample_mutations = sample_mutations[
-                [col for col in sample_mutations.columns if col in self.select_cols]
+                [col for col in sample_mutations.columns if col in self.dims]
             ]
         return sample_mutations
 
@@ -69,24 +79,25 @@ class ToPandasCountMatrix(Transform):
     def __init__(
         self,
         dims: List[str],
+        dim_refs: Optional[dict[str, list]] = None,
         index_cols: Optional[List[str]] = None,
-        filter_rows: Optional[dict[str, list]] = None,
     ) -> None:
         self.dims = dims
+        self.dim_refs = dim_refs
         self.index_cols = ["patientId"] if index_cols is None else index_cols
-        self.filter_rows = filter_rows
 
     def __call__(self, sample_mutations: pd.DataFrame) -> pd.DataFrame:
-        filter_transform = FilterSelect(filter_rows=self.filter_rows)
-        mutations = filter_transform(sample_mutations=sample_mutations)
+        if self.dim_refs:
+            filter_transform = FilterSelect(dim_refs=self.dim_refs)
+            sample_mutations = filter_transform(sample_mutations=sample_mutations)
         all_dims = set(self.dims) | set(self.index_cols)
-        if not all_dims.issubset(mutations.columns):
+        if not all_dims.issubset(sample_mutations.columns):
             raise ValueError("Not all dims and index_cols are included in data.")
-        mutation_counts = mutations.groupby(self.dims).size()
+        mutation_counts = sample_mutations.groupby(self.dims).size()
         mutation_counts = mutation_counts.reset_index().rename(columns={0: "count"})
 
         mutations_matrix = pd.pivot_table(
-            mutations,
+            mutation_counts,
             values="count",
             index=self.index_cols,
             columns=self.dims,
@@ -111,11 +122,9 @@ class ToSparseCountTensor(Transform):
         self,
         dims: List[str],
         dim_refs: Optional[Dict[str, List[str]]] = None,
-        filter_rows: Optional[dict[str, list]] = None,
     ) -> None:
         self.dims = dims
         self.dim_refs = {} if dim_refs is None else dim_refs
-        self.filter_rows = filter_rows
 
     def __call__(
         self,
@@ -131,8 +140,8 @@ class ToSparseCountTensor(Transform):
                 else:
                     raise ValueError(f"No dimension reference available for {dim}")
 
-        filter_transform = FilterSelect(filter_rows=self.filter_rows)
-        sample_mutations = filter_transform(sample_mutations=sample_mutations)
+        dim_ref_filters = FilterSelect(dim_refs=tmp_dim_refs)
+        sample_mutations = dim_ref_filters(sample_mutations=sample_mutations)
         mutation_counts = sample_mutations.groupby(self.dims).size()
         mutation_counts = mutation_counts.reset_index().rename(columns={0: "count"})
 
@@ -142,7 +151,7 @@ class ToSparseCountTensor(Transform):
             ).codes
         tensor_index = mutation_counts[self.dims].transpose().to_numpy().tolist()
         tensor_values = mutation_counts["count"].tolist()
-        tensor_size = tuple(len(dim_ref) for dim_ref in tmp_dim_refs.values())
+        tensor_size = tuple(len(tmp_dim_refs[dim]) for dim in self.dims)
 
         return torch.sparse_coo_tensor(tensor_index, tensor_values, tensor_size)
 
