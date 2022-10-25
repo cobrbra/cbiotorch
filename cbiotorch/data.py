@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import Dataset
 
 
-from .loaders import CBioPortalLoader, LoadMutationsFromFileThenAPI
+from .api import CBioPortalGetter, GetMutationsFromFileThenAPI
 from .transforms import Compose, Transform, FilterSelect
 
 
@@ -19,7 +19,7 @@ class MutationDataset(Dataset):
     def __init__(
         self,
         study_id: str,
-        loader: CBioPortalLoader = LoadMutationsFromFileThenAPI(),
+        loader: CBioPortalGetter = GetMutationsFromFileThenAPI(),
         transform: Transform | List[Transform] = FilterSelect(),
     ) -> None:
         """

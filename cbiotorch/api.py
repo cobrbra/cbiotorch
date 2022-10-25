@@ -1,4 +1,4 @@
-""" Loader functions to supply CBioPortal data. """
+""" Getter functions to supply CBioPortal data. """
 
 from abc import ABC, abstractmethod
 from os.path import join
@@ -13,20 +13,20 @@ from .cbioportal import (  # type: ignore
 )
 
 
-class CBioPortalLoader(ABC):
-    """Abstract base class for loaders."""
+class CBioPortalGetter(ABC):
+    """Abstract base class for getters."""
 
     @abstractmethod
     def __init__(self):
-        """Initialise loader with any necessary info e.g. API url, file directory."""
+        """Initialise getter with any necessary info e.g. API url, file directory."""
 
     @abstractmethod
     def __call__(self, study_id: str) -> Tuple[pd.DataFrame, ...]:
-        """Load CBioPortal data."""
+        """Get CBioPortal data."""
 
 
-class LoadMutationsFromAPI(CBioPortalLoader):
-    """Loader from CBioPortal's REST API using Bravado."""
+class GetMutationsFromAPI(CBioPortalGetter):
+    """Getter from CBioPortal's REST API using Bravado."""
 
     def __init__(self, from_url: str = "https://www.cbioportal.org/api/v2/api-docs") -> None:
         self.from_url = from_url
@@ -49,8 +49,8 @@ class LoadMutationsFromAPI(CBioPortalLoader):
         return mutations_df, samples_df, sample_genes_df
 
 
-class LoadMutationsFromFile(CBioPortalLoader):
-    """Load data already downloaded from file."""
+class GetMutationsFromFile(CBioPortalGetter):
+    """Get data already downloaded from file."""
 
     def __init__(self, from_dir: str = ".") -> None:
         self.from_dir = from_dir
@@ -66,8 +66,8 @@ class LoadMutationsFromFile(CBioPortalLoader):
         return mutations_df, samples_df, sample_genes_df
 
 
-class LoadMutationsFromFileThenAPI(CBioPortalLoader):
-    """Try loading data from file, if unsuccessful load from API."""
+class GetMutationsFromFileThenAPI(CBioPortalGetter):
+    """Try getting data from file, if unsuccessful get from API."""
 
     def __init__(
         self,
@@ -79,15 +79,15 @@ class LoadMutationsFromFileThenAPI(CBioPortalLoader):
 
     def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
-        loader_from_file = LoadMutationsFromFile(from_dir=self.from_dir)
-        loader_from_api = LoadMutationsFromAPI(from_url=self.from_url)
+        getter_from_file = GetMutationsFromFile(from_dir=self.from_dir)
+        getter_from_api = GetMutationsFromAPI(from_url=self.from_url)
 
         try:
-            loaded_datasets = loader_from_file(study_id=study_id)
+            datasets = getter_from_file(study_id=study_id)
         except FileNotFoundError:
-            loaded_datasets = loader_from_api(study_id=study_id)
+            datasets = getter_from_api(study_id=study_id)
 
-        return loaded_datasets
+        return datasets
 
 
 def get_mutations_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.DataFrame:
