@@ -39,9 +39,9 @@ class MutationDataset(Dataset):
             samples.append(study_samples)
             sample_genes.append(study_sample_genes)
 
-        self.mutations = pd.concat(mutations)
-        self.samples = pd.concat(samples)
-        self.sample_genes = pd.concat(sample_genes)
+        self.mutations = pd.concat(mutations, ignore_index=True)
+        self.samples = pd.concat(samples, ignore_index=True)
+        self.sample_genes = pd.concat(sample_genes).fillna(False)
 
         self.auto_gene_panel = self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
         self.auto_dim_ref = dict(
