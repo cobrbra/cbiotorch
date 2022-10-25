@@ -71,7 +71,7 @@ class MutationDataset(Dataset):
         """Reset the transform associated with a dataset to identity."""
         self.transform = FilterSelect()
 
-    def write(self, out_dir: str = ".", replace: bool = False) -> None:
+    def write(self, out_dir: str = "datasets", replace: bool = False) -> None:
         """
         Write mutation and sample, and gene panel spec files.
 

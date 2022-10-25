@@ -52,7 +52,7 @@ class GetMutationsFromAPI(CBioPortalGetter):
 class GetMutationsFromFile(CBioPortalGetter):
     """Get data already downloaded from file."""
 
-    def __init__(self, from_dir: str = ".") -> None:
+    def __init__(self, from_dir: str = "datasets") -> None:
         self.from_dir = from_dir
 
     def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -71,7 +71,7 @@ class GetMutationsFromFileThenAPI(CBioPortalGetter):
 
     def __init__(
         self,
-        from_dir: str = ".",
+        from_dir: str = "datasets",
         from_url: str = "https://www.cbioportal.org/api/v2/api-docs",
     ) -> None:
         self.from_dir = from_dir
