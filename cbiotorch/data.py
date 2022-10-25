@@ -18,19 +18,31 @@ class MutationDataset(Dataset):
 
     def __init__(
         self,
-        study_id: str,
-        loader: CBioPortalGetter = GetMutationsFromFileThenAPI(),
+        study_id: str | List[str],
+        getter: CBioPortalGetter = GetMutationsFromFileThenAPI(),
         transform: Transform | List[Transform] = FilterSelect(),
     ) -> None:
         """
         Args:
-            study_id (string): identifier for study.
-            from_url (string): URL to use for querying.
+            study_id (string): identifier for study/studies.
+            getter (string): getter function to use for datasets.
             transform (optional Transform): any transform to be applied to individual samples.
-
         """
-        self.study_id = study_id
-        self.mutations, self.samples, self.sample_genes = loader(study_id=self.study_id)
+        self.study_id = [study_id] if isinstance(study_id, str) else study_id
+        mutations = []
+        samples = []
+        sample_genes = []
+
+        for study in study_id:
+            study_mutations, study_samples, study_sample_genes = getter(study_id=study)
+            mutations.append(study_mutations)
+            samples.append(study_samples)
+            sample_genes.append(study_sample_genes)
+
+        self.mutations = pd.concat(mutations)
+        self.samples = pd.concat(samples)
+        self.sample_genes = pd.concat(sample_genes)
+
         self.auto_gene_panel = self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
         self.auto_dim_ref = dict(
             {
@@ -79,18 +91,22 @@ class MutationDataset(Dataset):
             out_dir (string): directory into which to write study datasets.
             replace (boolean): whether to replace an already existing directory.
         """
-        if isdir(pjoin(out_dir, self.study_id)):
-            if not replace:
-                raise ValueError(
-                    f"Directory {pjoin(out_dir, self.study_id)} already exists. "
-                    "Set replace=True or name new directory.",
-                )
-
-        else:
-            makedirs(pjoin(out_dir, self.study_id))
-
-        self.mutations.to_csv(pjoin(out_dir, self.study_id, "mutations.csv"), index=False)
-        self.samples.to_csv(pjoin(out_dir, self.study_id, "samples.csv"), index=False)
-        self.sample_genes.to_csv(
-            pjoin(out_dir, self.study_id, "sample_genes.csv"), index_label="sample_id"
-        )
+        for study in self.study_id:
+            if isdir(pjoin(out_dir, study)):
+                if not replace:
+                    raise ValueError(
+                        f"Directory {pjoin(out_dir, study)} already exists. "
+                        "Set replace=True or name new directory.",
+                    )
+            else:
+                makedirs(pjoin(out_dir, study))
+            study_samples = self.samples.sampleId[self.samples.studyId == study].tolist()
+            self.mutations[self.mutations.sampleId.isin(study_samples)].to_csv(
+                pjoin(out_dir, study, "mutations.csv"), index=False
+            )
+            self.samples[self.samples.sampleId.isin(study_samples)].to_csv(
+                pjoin(out_dir, study, "samples.csv"), index=False
+            )
+            self.sample_genes[self.sample_genes.index.isin(study_samples)].to_csv(
+                pjoin(out_dir, study, "sample_genes.csv"), index_label="sample_id"
+            )
