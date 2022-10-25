@@ -114,10 +114,11 @@ class ToSparseCountTensor(Transform):
     ) -> torch.Tensor:
 
         # Attempt to find a reference set for every tensor dimension
+        tmp_dim_refs = self.dim_refs
         for dim in self.dims:
-            if dim not in self.dim_refs.keys():
+            if dim not in tmp_dim_refs.keys():
                 if dim in sample_mutations.columns:
-                    self.dim_refs[dim] = sample_mutations[dim].unique().astype(str).tolist()
+                    tmp_dim_refs[dim] = sample_mutations[dim].unique().astype(str).tolist()
                 else:
                     raise ValueError(f"No dimension reference available for {dim}")
 
@@ -128,11 +129,11 @@ class ToSparseCountTensor(Transform):
 
         for dim in self.dims:
             mutation_counts[dim] = pd.Categorical(
-                values=mutation_counts[dim].astype(str), categories=self.dim_refs[dim]
+                values=mutation_counts[dim].astype(str), categories=tmp_dim_refs[dim]
             ).codes
         tensor_index = mutation_counts[self.dims].transpose().to_numpy().tolist()
         tensor_values = mutation_counts["count"].tolist()
-        tensor_size = tuple(len(dim_ref) for dim_ref in self.dim_refs.values())
+        tensor_size = tuple(len(dim_ref) for dim_ref in tmp_dim_refs.values())
 
         return torch.sparse_coo_tensor(tensor_index, tensor_values, tensor_size)
 
