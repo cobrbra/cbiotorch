@@ -2,7 +2,7 @@
 
 from os.path import join as pjoin, isdir
 from os import makedirs
-from typing import List
+from typing import Hashable, List
 
 import pandas as pd
 import torch
@@ -33,7 +33,11 @@ class MutationDataset(Dataset):
         self.mutations, self.samples, self.sample_genes = loader(study_id=self.study_id)
         self.auto_gene_panel = self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
         self.auto_dim_ref = dict(
-            {dim: self.mutations[dim].unique().tolist() for dim in self.mutations.columns},
+            {
+                dim: self.mutations[dim].unique().tolist()
+                for dim in self.mutations.columns
+                if isinstance(self.mutations[dim][0], Hashable)
+            },
             hugoGeneSymbol=self.auto_gene_panel,
         )
         if isinstance(transform, list):
