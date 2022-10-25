@@ -58,6 +58,10 @@ class MutationDataset(Dataset):
         """Add a (further) transform to the mutation dataset."""
         self.transform = Compose([self.transform, transform])
 
+    def reset_transform(self) -> None:
+        """Reset the transform associated with a dataset to identity."""
+        self.transform = FilterSelect()
+
     def write(self, out_dir: str = ".", replace: bool = False) -> None:
         """
         Write mutation and sample, and gene panel spec files.
