@@ -57,10 +57,12 @@ class GetMutationsFromFile(CBioPortalGetter):
 
     def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
-        mutations_df = pd.read_csv(join(self.from_dir, study_id, "mutations.csv"))
-        samples_df = pd.read_csv(join(self.from_dir, study_id, "samples.csv"))
+        mutations_df = pd.read_csv(join(self.from_dir, study_id, "mutations.csv"), low_memory=False)
+        samples_df = pd.read_csv(join(self.from_dir, study_id, "samples.csv"), low_memory=False)
         sample_genes_df = pd.read_csv(
-            join(self.from_dir, study_id, "sample_genes.csv"), index_col="sample_id"
+            join(self.from_dir, study_id, "sample_genes.csv"),
+            index_col="sample_id",
+            low_memory=False,
         )
 
         return mutations_df, samples_df, sample_genes_df
