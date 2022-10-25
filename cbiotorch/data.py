@@ -31,6 +31,11 @@ class MutationDataset(Dataset):
         """
         self.study_id = study_id
         self.mutations, self.samples, self.sample_genes = loader(study_id=self.study_id)
+        self.auto_gene_panel = self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
+        self.auto_dim_ref = dict(
+            {dim: self.mutations[dim].unique().tolist() for dim in self.mutations.columns},
+            hugoGeneSymbol=self.auto_gene_panel,
+        )
         if isinstance(transform, list):
             self.transform: Transform = Compose(transform)
         else:
