@@ -114,7 +114,7 @@ class ToSparseCountTensor(Transform):
     ) -> torch.Tensor:
 
         # Attempt to find a reference set for every tensor dimension
-        tmp_dim_refs = self.dim_refs
+        tmp_dim_refs = self.dim_refs.copy()
         for dim in self.dims:
             if dim not in tmp_dim_refs.keys():
                 if dim in sample_mutations.columns:
