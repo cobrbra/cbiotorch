@@ -1,7 +1,7 @@
 """ Dataset classes for cBioPortal datasets. """
 
 from os.path import join as pjoin, isdir
-from os import makedirs
+from os import makedirs, listdir
 from typing import Dict, Hashable, List
 
 import pandas as pd
@@ -9,12 +9,12 @@ import torch
 from torch.utils.data import Dataset
 
 
-from .api import CBioPortalGetter, GetMutationsFromFileThenAPI
+from .api import CBioPortalGetter, GetMutationsFromFileThenAPI, GetClinicalFromFileThenAPI
 from .transforms import Compose, Transform, FilterSelect
 
 
 class MutationDataset(Dataset):
-    """PyTorch Dataset class for cBioPortal mutation data."""
+    """PyTorch dataset class for cBioPortal mutation data."""
 
     def __init__(
         self,
@@ -33,7 +33,7 @@ class MutationDataset(Dataset):
         samples = []
         sample_genes = []
 
-        for study in study_id:
+        for study in self.study_id:
             study_mutations, study_samples, study_sample_genes = getter(study_id=study)
             mutations.append(study_mutations)
             samples.append(study_samples)
@@ -42,8 +42,6 @@ class MutationDataset(Dataset):
         self.mutations = pd.concat(mutations, ignore_index=True)
         self.samples = pd.concat(samples, ignore_index=True)
         self.sample_genes = pd.concat(sample_genes).fillna(False)
-
-        self.auto_gene_panel = self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
 
         if isinstance(transform, list):
             self.transform: Transform = Compose(transform)
@@ -56,17 +54,17 @@ class MutationDataset(Dataset):
 
     def __getitem__(self, idx: int) -> pd.DataFrame | torch.Tensor:
         """
-        Access an individual sample in the dataset.
+        Access an individual sample's mutation information.
         Args:
             idx (integer): should take a value between zero and the length of the dataset
         """
         sample_id = str(self.samples.at[idx, "sampleId"])
-        sample = self.mutations[self.mutations.sampleId == sample_id]
+        sample_mutations = self.mutations[self.mutations.sampleId == sample_id]
 
         if self.transform:
-            sample = self.transform(sample)
+            sample_mutations = self.transform(sample_mutations)
 
-        return sample
+        return sample_mutations
 
     def add_transform(self, transform: Transform) -> None:
         """Add a (further) transform to the mutation dataset."""
@@ -76,6 +74,12 @@ class MutationDataset(Dataset):
         """Reset the transform associated with a dataset to identity."""
         self.transform = FilterSelect()
 
+    @property
+    def auto_gene_panel(self):
+        """Produce an automatically selected maximal viable gene panel."""
+        return self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
+
+    @property
     def auto_dim_refs(self, use_auto_gene_panel: bool = True) -> Dict[str, List[str]]:
         """Produce an automatically inferred reference set for all mutation features"""
         auto_dim_ref = {
@@ -90,7 +94,7 @@ class MutationDataset(Dataset):
 
     def write(self, out_dir: str = "datasets", replace: bool = False) -> None:
         """
-        Write mutation and sample, and gene panel spec files.
+        Write mutation, sample, and gene panel spec files.
 
         Args:
             out_dir (string): directory into which to write study datasets.
