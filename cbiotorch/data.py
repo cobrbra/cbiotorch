@@ -80,16 +80,14 @@ class MutationDataset(Dataset):
         return self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
 
     @property
-    def auto_dim_refs(self, use_auto_gene_panel: bool = True) -> Dict[str, List[str]]:
+    def auto_dim_refs(self) -> Dict[str, List[str]]:
         """Produce an automatically inferred reference set for all mutation features"""
         auto_dim_ref = {
             dim: self.mutations[dim].unique().tolist()
             for dim in self.mutations.columns
             if isinstance(self.mutations[dim][0], Hashable)
         }
-        if use_auto_gene_panel:
             auto_dim_ref["hugoGeneSymbol"] = self.auto_gene_panel
-
         return auto_dim_ref
 
     def write(self, out_dir: str = "datasets", replace: bool = False) -> None:
