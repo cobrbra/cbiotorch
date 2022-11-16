@@ -84,7 +84,7 @@ class ToPandasCountMatrix(Transform):
     ) -> None:
         self.dims = dims
         self.dim_refs = dim_refs
-        self.index_cols = ["patientId"] if index_cols is None else index_cols
+        self.index_cols = ["sampleId"] if index_cols is None else index_cols
 
     def __call__(self, sample_mutations: pd.DataFrame) -> pd.DataFrame:
         if self.dim_refs:

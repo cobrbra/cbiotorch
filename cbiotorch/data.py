@@ -14,7 +14,14 @@ from .transforms import Compose, Transform, FilterSelect
 
 
 class MutationDataset(Dataset):
-    """PyTorch dataset class for cBioPortal mutation data."""
+    """
+    PyTorch dataset class for cBioPortal mutation data.
+
+    Example:
+    > from cbiotorch.data import MutationDataset
+    > msk_mutations = MutationDataset(study_id=["msk_impact_2017", "tmb_mskcc_2018"])
+    > msk_mutations.write(replace=True)
+    """
 
     def __init__(
         self,
@@ -24,9 +31,12 @@ class MutationDataset(Dataset):
     ) -> None:
         """
         Args:
-            study_id (string): identifier for study/studies.
-            getter (string): getter function to use for datasets.
-            transform (optional Transform): any transform to be applied to individual samples.
+            study_id (string or list of strings): cBioPortal study identifiers.
+            getter (CBioPortalGetter object): object inheriting from cbiotorch.api.CBioPortalGetter,
+                providing function for downloading/loading mutation data.
+            transform (Transform object or list of Transform objects): object inheriting from
+                cbiotorch.transforms.Transform, providing function for applying transforms to
+                individual samples.
         """
         self.study_id = [study_id] if isinstance(study_id, str) else study_id
         mutations = []
@@ -87,7 +97,7 @@ class MutationDataset(Dataset):
             for dim in self.mutations.columns
             if isinstance(self.mutations[dim][0], Hashable)
         }
-            auto_dim_ref["hugoGeneSymbol"] = self.auto_gene_panel
+        auto_dim_ref["hugoGeneSymbol"] = self.auto_gene_panel
         return auto_dim_ref
 
     def write(self, out_dir: str = "datasets", replace: bool = False) -> None:
@@ -116,4 +126,79 @@ class MutationDataset(Dataset):
             )
             self.sample_genes[self.sample_genes.index.isin(study_samples)].to_csv(
                 pjoin(out_dir, study, "sample_genes.csv"), index_label="sample_id"
+            )
+
+
+class ClinicalDataset(Dataset):
+    """PyTorch dataset class for cBioPortal clinical data."""
+
+    def __init__(
+        self,
+        study_id: str | List[str],
+        getter: CBioPortalGetter = GetClinicalFromFileThenAPI(),
+        transform: Transform | List[Transform] = FilterSelect(),
+    ) -> None:
+        """
+        Args:
+            study_id (string): identifier for study/studies.
+            getter (string): getter function to use for datasets.
+        """
+        self.study_id = [study_id] if isinstance(study_id, str) else study_id
+        patients = []
+        clinical = []
+        for study in self.study_id:
+            study_patients, study_clinical = getter(study_id=study)
+            patients.append(study_patients)
+            clinical.append(study_clinical)
+
+        self.patients = pd.concat(patients, ignore_index=True)
+        self.clinical = pd.concat(clinical, ignore_index=True)
+
+        if isinstance(transform, list):
+            self.transform: Transform = Compose(transform)
+        else:
+            self.transform = transform
+
+    def __len__(self) -> int:
+        return len(self.patients)
+
+    def __getitem__(self, idx: int) -> pd.DataFrame | torch.Tensor:
+        """
+        Access an individual patient's clinical information.
+        Args:
+            idx (integer): should take a value between zero and the length of the dataset
+        """
+        patient_id = str(self.patients.at[idx, "patientId"])
+        patient_clinical = self.clinical[self.clinical.patientId == patient_id]
+
+        if self.transform:
+            patient_clinical = self.transform(patient_clinical)
+
+        return patient_clinical
+
+    def write(self, out_dir: str = "datasets", replace: bool = False) -> None:
+        """
+        Write patient and clinical files.
+
+        Args:
+            out_dir (string): directory into which to write study datasets.
+            replace (boolean): whether to replace already existing directory/files.
+        """
+        for study in self.study_id:
+            if isdir(pjoin(out_dir, study)):
+                expected_files = ["patients.csv", "clinical.csv"]
+                files_exist = [file in listdir(pjoin(out_dir, study)) for file in expected_files]
+                if all(files_exist) and not replace:
+                    raise ValueError(
+                        f"Directory {pjoin(out_dir, study)} already populated. "
+                        "Set replace=True or name new directory.",
+                    )
+            else:
+                makedirs(pjoin(out_dir, study))
+            study_patients = self.patients.patientId[self.patients.studyId == study].tolist()
+            self.patients[self.patients.patientId.isin(study_patients)].to_csv(
+                pjoin(out_dir, study, "patients.csv"), index=False
+            )
+            self.clinical[self.clinical.patientId.isin(study_patients)].to_csv(
+                pjoin(out_dir, study, "clinical.csv"), index=False
             )
