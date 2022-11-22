@@ -6,6 +6,7 @@ from typing import cast, List, Tuple
 
 import pandas as pd
 
+from . import logger
 from .cbioportal import (  # type: ignore
     CBioPortalSwaggerClient,
     ClinicalAttributeModel,
@@ -35,6 +36,7 @@ class GetMutationsFromAPI(CBioPortalGetter):
 
     def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Get mutation, sample, and gene panel information for a given study."""
+        logger.info("Searching for mutations from cBioPortal API.")
         client = CBioPortalSwaggerClient.from_url(
             self.from_url,
             config={
@@ -58,14 +60,16 @@ class GetMutationsFromFile(CBioPortalGetter):
         self.from_dir = from_dir
 
     def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-
-        mutations_df = pd.read_csv(join(self.from_dir, study_id, "mutations.csv"), low_memory=False)
-        samples_df = pd.read_csv(join(self.from_dir, study_id, "samples.csv"), low_memory=False)
+        logger.info("Searching for mutations from File.")
+        mutations_df = pd.read_csv(join(self.from_dir, study_id, "mutations.csv"))
+        logger.info("Read mutations")
+        samples_df = pd.read_csv(join(self.from_dir, study_id, "samples.csv"))
+        logger.info("Read samples")
         sample_genes_df = pd.read_csv(
             join(self.from_dir, study_id, "sample_genes.csv"),
             index_col="sample_id",
-            low_memory=False,
         )
+        logger.info("Read sample/genes")
 
         return mutations_df, samples_df, sample_genes_df
 
