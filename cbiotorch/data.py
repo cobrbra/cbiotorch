@@ -2,7 +2,7 @@
 
 from os.path import join as pjoin, isdir
 from os import makedirs, listdir
-from typing import Dict, Hashable, List
+from typing import Hashable
 
 import pandas as pd
 import torch
@@ -25,9 +25,9 @@ class MutationDataset(Dataset):
 
     def __init__(
         self,
-        study_id: str | List[str],
+        study_id: str | list[str],
         getter: CBioPortalGetter = GetMutationsFromFileThenAPI(),
-        transform: Transform | List[Transform] = FilterSelect(),
+        transform: Transform | list[Transform] = FilterSelect(),
     ) -> None:
         """
         Args:
@@ -90,7 +90,7 @@ class MutationDataset(Dataset):
         return self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
 
     @property
-    def auto_dim_refs(self) -> Dict[str, List[str]]:
+    def auto_dim_refs(self) -> dict[str, list[str]]:
         """Produce an automatically inferred reference set for all mutation features"""
         auto_dim_ref = {
             dim: self.mutations[dim].unique().tolist()
@@ -134,9 +134,9 @@ class ClinicalDataset(Dataset):
 
     def __init__(
         self,
-        study_id: str | List[str],
+        study_id: str | list[str],
         getter: CBioPortalGetter = GetClinicalFromFileThenAPI(),
-        transform: Transform | List[Transform] = FilterSelect(),
+        transform: Transform | list[Transform] = FilterSelect(),
     ) -> None:
         """
         Args:

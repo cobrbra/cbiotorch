@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from os.path import join
-from typing import cast, List, Tuple
+from typing import cast
 
 import pandas as pd
 
@@ -24,7 +24,7 @@ class CBioPortalGetter(ABC):
         """Initialise getter with any necessary info e.g. API url, file directory."""
 
     @abstractmethod
-    def __call__(self, study_id: str) -> Tuple[pd.DataFrame, ...]:
+    def __call__(self, study_id: str) -> tuple[pd.DataFrame, ...]:
         """Get CBioPortal data."""
 
 
@@ -34,7 +34,7 @@ class GetMutationsFromAPI(CBioPortalGetter):
     def __init__(self, from_url: str = "https://www.cbioportal.org/api/v2/api-docs") -> None:
         self.from_url = from_url
 
-    def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def __call__(self, study_id: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Get mutation, sample, and gene panel information for a given study."""
         logger.info("Searching for mutations from cBioPortal API.")
         client = CBioPortalSwaggerClient.from_url(
@@ -59,7 +59,7 @@ class GetMutationsFromFile(CBioPortalGetter):
     def __init__(self, from_dir: str = "datasets") -> None:
         self.from_dir = from_dir
 
-    def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def __call__(self, study_id: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         logger.info("Searching for mutations from File.")
         mutations_df = pd.read_csv(join(self.from_dir, study_id, "mutations.csv"))
         logger.info("Read mutations")
@@ -85,7 +85,7 @@ class GetMutationsFromFileThenAPI(CBioPortalGetter):
         self.from_dir = from_dir
         self.from_url = from_url
 
-    def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def __call__(self, study_id: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
         getter_from_file = GetMutationsFromFile(from_dir=self.from_dir)
         getter_from_api = GetMutationsFromAPI(from_url=self.from_url)
@@ -104,7 +104,7 @@ class GetClinicalFromAPI(CBioPortalGetter):
     def __init__(self, from_url: str = "https://www.cbioportal.org/api/v2/api-docs") -> None:
         self.from_url = from_url
 
-    def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def __call__(self, study_id: str) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Get patient and clinical information from API for a given study."""
         client = CBioPortalSwaggerClient.from_url(
             self.from_url,
@@ -127,7 +127,7 @@ class GetClinicalFromFile(CBioPortalGetter):
     def __init__(self, from_dir: str = "datasets") -> None:
         self.from_dir = from_dir
 
-    def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def __call__(self, study_id: str) -> tuple[pd.DataFrame, pd.DataFrame]:
 
         patients_df = pd.read_csv(join(self.from_dir, study_id, "patients.csv"), low_memory=False)
         clinical_df = pd.read_csv(join(self.from_dir, study_id, "clinical.csv"), low_memory=False)
@@ -146,7 +146,7 @@ class GetClinicalFromFileThenAPI(CBioPortalGetter):
         self.from_dir = from_dir
         self.from_url = from_url
 
-    def __call__(self, study_id: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def __call__(self, study_id: str) -> tuple[pd.DataFrame, pd.DataFrame]:
 
         getter_from_file = GetClinicalFromFile(from_dir=self.from_dir)
         getter_from_api = GetClinicalFromAPI(from_url=self.from_url)
@@ -172,7 +172,7 @@ def get_mutations_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd
                 {k: getattr(m, k) for k in dir(m)},
                 **{k: getattr(m.gene, k) for k in dir(m.gene)},
             )
-            for m in cast(List[MutationModel], mutations)
+            for m in cast(list[MutationModel], mutations)
         ]
     )
     return mutations_df
@@ -181,7 +181,7 @@ def get_mutations_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd
 def get_samples_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.DataFrame:
     """Get samples dataframe from CBioPortal API."""
     samples = client.Samples.getAllSamplesInStudyUsingGET(studyId=study_id).result()
-    samples = cast(List[SampleModel], samples)
+    samples = cast(list[SampleModel], samples)
     samples_df = pd.DataFrame(
         [
             {
@@ -233,7 +233,7 @@ def get_sample_genes_from_api(client: CBioPortalSwaggerClient, study_id: str) ->
 def get_clinical_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.DataFrame:
     """Get clinical dataframe from CBioPortal API."""
     clinical = client.Clinical_Data.getAllClinicalDataInStudyUsingGET(studyId=study_id).result()
-    clinical = cast(List[ClinicalAttributeModel], clinical)
+    clinical = cast(list[ClinicalAttributeModel], clinical)
     clinical_df_long = pd.DataFrame(
         [
             {clinical_attribute: getattr(c, clinical_attribute) for clinical_attribute in dir(c)}
@@ -252,7 +252,7 @@ def get_clinical_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.
 def get_patients_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.DataFrame:
     """Get patients dataframe from CBioPortal API."""
     patients = client.Patients.getAllPatientsInStudyUsingGET(studyId=study_id).result()
-    patients = cast(List[PatientModel], patients)
+    patients = cast(list[PatientModel], patients)
     patients_df = pd.DataFrame(
         [
             {

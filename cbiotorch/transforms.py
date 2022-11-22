@@ -6,7 +6,7 @@ images.
 
 
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, List
+from typing import Optional
 
 import pandas as pd
 import torch
@@ -16,7 +16,7 @@ class Transform(ABC):
     """Base class for Transforms to be applied to mutation data."""
 
     @abstractmethod
-    def __init__(self, dims: Optional[List[str]], dim_refs: Optional[Dict[str, List[str]]]) -> None:
+    def __init__(self, dims: Optional[list[str]], dim_refs: Optional[dict[str, list[str]]]) -> None:
         """
         Args:
             dims (list of strings): identifies the features (columns) of the underlying mutations
@@ -44,7 +44,7 @@ class FilterSelect(Transform):
 
     def __init__(
         self,
-        dims: Optional[List[str] | str] = None,
+        dims: Optional[list[str] | str] = None,
         dim_refs: Optional[dict[str, list]] = None,
     ) -> None:
         self.dims = dims
@@ -78,9 +78,9 @@ class ToPandasCountMatrix(Transform):
 
     def __init__(
         self,
-        dims: List[str],
+        dims: list[str],
         dim_refs: Optional[dict[str, list]] = None,
-        index_cols: Optional[List[str]] = None,
+        index_cols: Optional[list[str]] = None,
     ) -> None:
         self.dims = dims
         self.dim_refs = dim_refs
@@ -120,8 +120,8 @@ class ToSparseCountTensor(Transform):
 
     def __init__(
         self,
-        dims: List[str],
-        dim_refs: Optional[Dict[str, List[str]]] = None,
+        dims: list[str],
+        dim_refs: Optional[dict[str, list[str]]] = None,
     ) -> None:
         self.dims = dims
         self.dim_refs = {} if dim_refs is None else dim_refs
@@ -159,7 +159,7 @@ class ToSparseCountTensor(Transform):
 class Compose(Transform):
     """Compose several transforms."""
 
-    def __init__(self, transforms: List[Transform]) -> None:
+    def __init__(self, transforms: list[Transform]) -> None:
         self.transforms = transforms
 
     def __call__(
