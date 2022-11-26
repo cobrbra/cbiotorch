@@ -103,7 +103,7 @@ def get_clinical_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.
     return clinical_df
 
 
-def get_patients_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.DataFrame:
+def get_patients_from_api(client: CBioPortalSwaggerClient, study_id: str):
     """Get patients dataframe from CBioPortal API."""
     patients = client.Patients.getAllPatientsInStudyUsingGET(studyId=study_id).result()
     patients = cast(list[PatientModel], patients)
@@ -115,5 +115,27 @@ def get_patients_from_api(client: CBioPortalSwaggerClient, study_id: str) -> pd.
             }
             for patient in patients
         ]
+    )
+    patient_clinical = client.Clinical_Data.getAllClinicalDataInStudyUsingGET(
+        studyId=study_id, clinicalDataType="PATIENT"
+    ).result()
+    patient_clinical = cast(list[PatientModel], patient_clinical)
+    patient_clinical_long_df = pd.DataFrame(
+        [
+            {k: getattr(clinical_attribute, k) for k in dir(clinical_attribute)}
+            for clinical_attribute in patient_clinical
+        ]
+    )
+    patient_clinical_df = pd.pivot(
+        data=patient_clinical_long_df,
+        values="value",
+        index=list(
+            set(patient_clinical_long_df.columns) - set(["clinicalAttributeId"] + ["value"])
+        ),
+        columns=["clinicalAttributeId"],
+    ).reset_index()
+    patients_df = patients_df.merge(
+        patient_clinical_df.drop(columns=["sampleId", "uniqueSampleKey"]),
+        on=["patientId", "studyId", "uniquePatientKey"],
     )
     return patients_df
