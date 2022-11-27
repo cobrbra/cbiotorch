@@ -1,20 +1,111 @@
 """ Dataset classes for cBioPortal datasets. """
-
+from os import makedirs
 from os.path import join as pjoin, isdir
-from os import makedirs, listdir
 from typing import Hashable
 
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+from .get import CBioPortalGetter, GetClinicalFromFileThenAPI, GetMutationsFromFileThenAPI
+from .transform import Transform, PreTransform, Compose, FilterSelect
 from .write import CBioPortalWriter, PandasWriter
 
-from .api import CBioPortalGetter, GetMutationsFromFileThenAPI, GetClinicalFromFileThenAPI
-from .transforms import Compose, Transform, FilterSelect
+
+class CBioPortalDataset(Dataset):
+    """PyTorch dataset class for CBioPortal data."""
+
+    def __init__(
+        self,
+        study_id: str | list[str],
+        getter: CBioPortalGetter,
+        pre_transform: PreTransform,
+        transform: Transform,
+        writer: CBioPortalWriter,
+    ) -> None:
+        self.study_id = [study_id] if isinstance(study_id, str) else study_id
+        self.getter = getter
+        self.files = self.get_files()
+        self.pre_transform = pre_transform
+
+        if self.pre_transform.strategy == "apply_principle":
+            self.files[self.principle_file] = self.pre_transform(self.files[self.principle_file])
+
+        elif self.pre_transform.strategy == "apply_all":
+            self.files = {file_id: self.pre_transform(file) for file_id, file in self.files.items()}
+
+        elif self.pre_transform.strategy == "filter_all":
+            self.files[self.principle_file] = self.pre_transform(self.files[self.principle_file])
+            filtered_indices = self.files[self.principle_file][self.index_column].unique()
+            for file_id in self.files:
+                self.files[file_id] = self.files[file_id][
+                    self.files[file_id][self.index_column].isin(filtered_indices)
+                ]
+
+        else:
+            raise ValueError(
+                f"Transform strategy value should be one of 'apply_princple', 'apply_all', or \
+                    'filter_all', but is {self.pre_transform.strategy}"
+            )
+
+        self.transform = transform
+        self.writer = writer
+
+    @property
+    def index_file(self) -> str:
+        """Property specifying file containing index (should be implemented for each subclass)."""
+        raise NotImplementedError
+
+    @property
+    def index_column(self) -> str:
+        """Name of column with index."""
+        raise NotImplementedError
+
+    @property
+    def principle_file(self) -> str:
+        """Property specifying file containing the principle data stored."""
+        raise NotImplementedError
+
+    def get_files(self) -> dict[str, pd.DataFrame]:
+        """Assign files (should be implemented for each subclass)."""
+        raise NotImplementedError
+
+    def __getitem__(self, index):
+        raise NotImplementedError
+
+    def __len__(self) -> int:
+        raise NotImplementedError
+
+    def add_transform(self, transform: Transform) -> None:
+        """Add a (further) transform to the mutation dataset."""
+        self.transform = Compose([self.transform, transform])
+
+    def reset_transform(self) -> None:
+        """Reset the transform associated with a dataset to identity."""
+        self.transform = FilterSelect()
+
+    def set_writer(self, writer: CBioPortalWriter):
+        """Reset or set the writer for dataset."""
+        self.writer = writer
+
+    def write(self):
+        """Write dataset to file."""
+        self.writer(self)
+
+    def get_write_hashable(self):
+        """Produce tuple for hashing."""
+        return (
+            tuple(self.study_id),
+            tuple(tuple(var) for var in vars(self.pre_transform).values()),
+            self.pre_transform.__class__,
+        )
+
+    def write_hash(self):
+        """Produce hash for appending to written directory name."""
+        return hash(self.get_write_hashable())
 
 
-class MutationDataset(Dataset):
+class MutationDataset(CBioPortalDataset):
     """
     PyTorch dataset class for cBioPortal mutation data.
 
@@ -28,7 +119,9 @@ class MutationDataset(Dataset):
         self,
         study_id: str | list[str],
         getter: CBioPortalGetter = GetMutationsFromFileThenAPI(),
-        transform: Transform | list[Transform] = FilterSelect(),
+        pre_transform: PreTransform = FilterSelect(),
+        transform: Transform = FilterSelect(),
+        writer: CBioPortalWriter = PandasWriter(),
     ) -> None:
         """
         Args:
@@ -39,29 +132,65 @@ class MutationDataset(Dataset):
                 cbiotorch.transforms.Transform, providing function for applying transforms to
                 individual samples.
         """
-        self.study_id = [study_id] if isinstance(study_id, str) else study_id
+        super().__init__(
+            study_id=study_id,
+            getter=getter,
+            pre_transform=pre_transform,
+            transform=transform,
+            writer=writer,
+        )
+
+    @property
+    def index_file(self) -> str:
+        return "sample"
+
+    @property
+    def index_column(self) -> str:
+        return "sampleId"
+
+    @property
+    def principle_file(self) -> str:
+        return "mutations"
+
+    def get_files(self) -> dict[str, pd.DataFrame]:
+        """Assign files (should be implemented for each subclass)."""
         mutations = []
         samples = []
         sample_genes = []
 
         for study in self.study_id:
-            study_mutations, study_samples, study_sample_genes = getter(study_id=study)
+            study_mutations, study_samples, study_sample_genes = self.getter(study_id=study)
             mutations.append(study_mutations)
             samples.append(study_samples)
             sample_genes.append(study_sample_genes)
 
-        self.mutations = pd.concat(mutations, ignore_index=True)
-        self.samples = pd.concat(samples, ignore_index=True)
-        self.sample_genes = pd.concat(sample_genes).fillna(False)
+        files = {
+            "mutations": pd.concat(mutations, ignore_index=True),
+            "samples": pd.concat(samples, ignore_index=True),
+            "sample_genes": pd.concat(sample_genes).fillna(False),
+        }
 
-        if isinstance(transform, list):
-            self.transform: Transform = Compose(transform)
-        else:
-            self.transform = transform
+        return files
+
+    @property
+    def auto_gene_panel(self):
+        """Produce an automatically selected maximal viable gene panel."""
+        return self.files["sample_genes"].columns[self.files["sample_genes"].all(axis=0)].tolist()
+
+    @property
+    def auto_dim_refs(self) -> dict[str, list[str]]:
+        """Produce an automatically inferred reference set for all mutation features"""
+        auto_dim_ref = {
+            dim: self.files["mutations"][dim].unique().tolist()
+            for dim in self.files["mutations"].columns
+            if isinstance(self.files["mutations"][dim][0], Hashable)
+        }
+        auto_dim_ref["hugoGeneSymbol"] = self.auto_gene_panel
+        return auto_dim_ref
 
     def __len__(self) -> int:
         """Returns number of samples in the dataset."""
-        return len(self.samples)
+        return len(self.files[self.index_file])
 
     def __getitem__(self, idx: int) -> pd.DataFrame | torch.Tensor:
         """
@@ -69,37 +198,13 @@ class MutationDataset(Dataset):
         Args:
             idx (integer): should take a value between zero and the length of the dataset
         """
-        sample_id = str(self.samples.at[idx, "sampleId"])
-        sample_mutations = self.mutations[self.mutations.sampleId == sample_id]
+        sample_id = str(self.files["samples"].at[idx, "sampleId"])
+        sample_mutations = self.files["mutations"][self.files["mutations"].sampleId == sample_id]
 
         if self.transform:
             sample_mutations = self.transform(sample_mutations)
 
         return sample_mutations
-
-    def add_transform(self, transform: Transform) -> None:
-        """Add a (further) transform to the mutation dataset."""
-        self.transform = Compose([self.transform, transform])
-
-    def reset_transform(self) -> None:
-        """Reset the transform associated with a dataset to identity."""
-        self.transform = FilterSelect()
-
-    @property
-    def auto_gene_panel(self):
-        """Produce an automatically selected maximal viable gene panel."""
-        return self.sample_genes.columns[self.sample_genes.all(axis=0)].tolist()
-
-    @property
-    def auto_dim_refs(self) -> dict[str, list[str]]:
-        """Produce an automatically inferred reference set for all mutation features"""
-        auto_dim_ref = {
-            dim: self.mutations[dim].unique().tolist()
-            for dim in self.mutations.columns
-            if isinstance(self.mutations[dim][0], Hashable)
-        }
-        auto_dim_ref["hugoGeneSymbol"] = self.auto_gene_panel
-        return auto_dim_ref
 
     def write(self, out_dir: str = "datasets", replace: bool = False) -> None:
         """
@@ -118,50 +223,74 @@ class MutationDataset(Dataset):
                     )
             else:
                 makedirs(pjoin(out_dir, study))
-            study_samples = self.samples.sampleId[self.samples.studyId == study].tolist()
-            self.mutations[self.mutations.sampleId.isin(study_samples)].to_csv(
+            study_samples = (
+                self.files[self.index_file]
+                .sampleId[self.files[self.index_file].studyId == study]
+                .tolist()
+            )
+            self.files["mutations"][self.files["mutations"].sampleId.isin(study_samples)].to_csv(
                 pjoin(out_dir, study, "mutations.csv"), index=False
             )
-            self.samples[self.samples.sampleId.isin(study_samples)].to_csv(
+            self.files["samples"][self.files["samples"].sampleId.isin(study_samples)].to_csv(
                 pjoin(out_dir, study, "samples.csv"), index=False
             )
-            self.sample_genes[self.sample_genes.index.isin(study_samples)].to_csv(
+            self.files["sample_genes"][self.files["sample_genes"].index.isin(study_samples)].to_csv(
                 pjoin(out_dir, study, "sample_genes.csv"), index_label="sample_id"
             )
 
 
-class ClinicalDataset(Dataset):
+class ClinicalDataset(CBioPortalDataset):
     """PyTorch dataset class for cBioPortal clinical data."""
 
     def __init__(
         self,
         study_id: str | list[str],
         getter: CBioPortalGetter = GetClinicalFromFileThenAPI(),
-        transform: Transform | list[Transform] = FilterSelect(),
+        pre_transform: PreTransform = FilterSelect(),
+        transform: Transform = FilterSelect(),
+        writer: CBioPortalWriter = PandasWriter(),
     ) -> None:
         """
         Args:
             study_id (string): identifier for study/studies.
             getter (string): getter function to use for datasets.
         """
-        self.study_id = [study_id] if isinstance(study_id, str) else study_id
+        super().__init__(
+            study_id=study_id,
+            getter=getter,
+            pre_transform=pre_transform,
+            transform=transform,
+            writer=writer,
+        )
+
+    @property
+    def index_file(self) -> str:
+        return "patients"
+
+    @property
+    def index_column(self) -> str:
+        return "patientId"
+
+    @property
+    def principle_file(self) -> str:
+        return "clinical"
+
+    def get_files(self) -> dict[str, pd.DataFrame]:
         patients = []
         clinical = []
         for study in self.study_id:
-            study_patients, study_clinical = getter(study_id=study)
+            study_patients, study_clinical = self.getter(study_id=study)
             patients.append(study_patients)
             clinical.append(study_clinical)
 
-        self.patients = pd.concat(patients, ignore_index=True)
-        self.clinical = pd.concat(clinical, ignore_index=True)
-
-        if isinstance(transform, list):
-            self.transform: Transform = Compose(transform)
-        else:
-            self.transform = transform
+        files = {
+            "patients": pd.concat(patients, ignore_index=True),
+            "clinical": pd.concat(clinical, ignore_index=True),
+        }
+        return files
 
     def __len__(self) -> int:
-        return len(self.patients)
+        return len(self.files["patients"])
 
     def __getitem__(self, idx: int) -> pd.DataFrame | torch.Tensor:
         """
@@ -169,8 +298,8 @@ class ClinicalDataset(Dataset):
         Args:
             idx (integer): should take a value between zero and the length of the dataset
         """
-        patient_id = str(self.patients.at[idx, "patientId"])
-        patient_clinical = self.clinical[self.clinical.patientId == patient_id]
+        patient_id = str(self.files["patients"].at[idx, "patientId"])
+        patient_clinical = self.files["clinical"][self.files["clinical"].patientId == patient_id]
 
         if self.transform:
             patient_clinical = self.transform(patient_clinical)
