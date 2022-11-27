@@ -8,6 +8,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+from .write import CBioPortalWriter, PandasWriter
 
 from .api import CBioPortalGetter, GetMutationsFromFileThenAPI, GetClinicalFromFileThenAPI
 from .transforms import Compose, Transform, FilterSelect
@@ -175,30 +176,3 @@ class ClinicalDataset(Dataset):
             patient_clinical = self.transform(patient_clinical)
 
         return patient_clinical
-
-    def write(self, out_dir: str = "datasets", replace: bool = False) -> None:
-        """
-        Write patient and clinical files.
-
-        Args:
-            out_dir (string): directory into which to write study datasets.
-            replace (boolean): whether to replace already existing directory/files.
-        """
-        for study in self.study_id:
-            if isdir(pjoin(out_dir, study)):
-                expected_files = ["patients.csv", "clinical.csv"]
-                files_exist = [file in listdir(pjoin(out_dir, study)) for file in expected_files]
-                if all(files_exist) and not replace:
-                    raise ValueError(
-                        f"Directory {pjoin(out_dir, study)} already populated. "
-                        "Set replace=True or name new directory.",
-                    )
-            else:
-                makedirs(pjoin(out_dir, study))
-            study_patients = self.patients.patientId[self.patients.studyId == study].tolist()
-            self.patients[self.patients.patientId.isin(study_patients)].to_csv(
-                pjoin(out_dir, study, "patients.csv"), index=False
-            )
-            self.clinical[self.clinical.patientId.isin(study_patients)].to_csv(
-                pjoin(out_dir, study, "clinical.csv"), index=False
-            )
