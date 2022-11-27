@@ -129,5 +129,8 @@ dmypy.json
 .pyre/
 
 # downloaded datasets
+datasets/
 msk_impact_2017
 tmb_mskcc_2018
+
+.DS_Store
